@@ -1,27 +1,106 @@
 import { useState } from "react";
 import { useLang } from "@/i18n/LangContext";
-import { missions as initial, wilayas } from "@/data/mock";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { Briefcase, MapPin, Plus, X, CalendarCheck } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import WilayaInput from "@/components/WilayaInput";
 
-type Mission = { id: string; employee: string; mission: string; wilaya: string; departure: string; returnDate: string };
+type Mission = {
+  id: string;
+  employee: string;
+  mission: string;
+  wilaya: string;
+  departure: string;
+  returnDate: string;
+};
 
-const empty = { employee: "", mission: "", wilaya: "", departure: "", returnDate: "" };
+const empty = {
+  employee: "",
+  mission: "",
+  wilaya: "",
+  departure: "",
+  returnDate: "",
+};
+
 
 const Missions = () => {
   const { t } = useLang();
-  const [list, setList] = useState<Mission[]>(initial);
+  const [list, setList] = useState<Mission[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setList([...list, { ...form, id: String(Date.now()) }]);
-    setForm(empty);
-    setOpen(false);
-  };
 
+  useEffect(() => {
+    const fetchMissions = async () => {
+      const { data, error } = await supabase
+        .from("missions")
+        .select("*");
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      const formatted =
+        data?.map((m) => ({
+          id: String(m.id_mission),
+          employee: `EMP ${m.id_emp}`,
+          mission: m.titre ?? "-",
+          wilaya: m.lieu ?? "-",
+          departure: m.date_depart,
+          returnDate: m.date_retour ?? "-",
+        })) || [];
+
+      setList(formatted);
+    };
+
+    fetchMissions();
+  }, []);
+
+
+const submit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const { data, error } = await supabase
+    .from("missions")
+    .insert([
+      {
+        id_emp: 3,
+        titre: form.mission,
+        lieu: form.wilaya,
+        date_depart: form.departure,
+        date_retour: form.returnDate,
+        statut: "EN_ATTENTE",
+      },
+    ])
+    .select();
+
+  if (error || !data?.length) {
+    console.error("MISSION INSERT ERROR:", error);
+    return;
+  }
+
+  const m = data[0];
+
+  setList((prev) => [
+    ...prev,
+    {
+      id: String(m.id_mission),
+      employee: `EMP ${m.id_emp}`,
+      mission: m.titre,
+      wilaya: m.lieu,
+      departure: m.date_depart,
+      returnDate: m.date_retour,
+    },
+  ]);
+
+  setForm(empty);
+  setOpen(false);
+};
+
+
+  
   const stats = [
     { label: t("totalMissions"), value: list.length, icon: Briefcase, tone: "primary" as const },
     { label: t("wilaya"), value: new Set(list.map((m) => m.wilaya)).size, icon: MapPin, tone: "amber" as const },
@@ -91,7 +170,12 @@ const Missions = () => {
               </div>
               <div className="md:col-span-2">
                 <label className="text-sm font-medium">{t("wilaya")}</label>
-                <WilayaInput required value={form.wilaya} onChange={(v) => setForm({ ...form, wilaya: v })} placeholder={wilayas[0]} />
+                <WilayaInput
+                  required
+                  value={form.wilaya}
+                  onChange={(v) => setForm({ ...form, wilaya: v })}
+                  placeholder="Alger"
+                />
               </div>
               <div>
                 <label className="text-sm font-medium">{t("departureDate")}</label>

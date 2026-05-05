@@ -1,14 +1,52 @@
+import { useEffect, useState } from "react";
 import { useLang } from "@/i18n/LangContext";
-import { badges } from "@/data/mock";
+import { supabase } from "@/lib/supabase";
 import { IdCard } from "lucide-react";
+
+type Badge = {
+  id: number;
+  employee: string;
+  department: string;
+  badgeId: string;
+  status: "active" | "inactive";
+};
 
 const Badges = () => {
   const { t } = useLang();
+  const [list, setList] = useState<Badge[]>([]);
+
+  useEffect(() => {
+    const fetchBadges = async () => {
+      const { data, error } = await supabase
+        .from("badges")
+        .select("*");
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      const formatted: Badge[] =
+        data?.map((b) => ({
+          id: b.id_badge,
+          employee: `EMP ${b.id_emp}`,
+          department: "—",
+          badgeId: b.code_badge,
+          status: b.actif ? ("active" as const) : ("inactive" as const),
+        })) || [];
+
+      setList(formatted);
+    };
+
+    fetchBadges();
+  }, []);
+
   return (
     <div className="space-y-5">
       <h2 className="text-2xl font-bold">{t("badges")}</h2>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {badges.map((b) => (
+        {list.map((b) => (
           <div
             key={b.id}
             className="bg-card rounded-xl border border-border p-5 flex items-center gap-4"
@@ -20,14 +58,20 @@ const Badges = () => {
             >
               <IdCard className="w-7 h-7" />
             </div>
+
             <div className="flex-1">
               <p className="font-semibold">{b.employee}</p>
               <p className="text-xs text-muted-foreground">{b.department}</p>
               <p className="text-xs font-mono mt-1">{b.badgeId}</p>
             </div>
-            <span className={`px-2 py-0.5 rounded-full text-xs ${
-              b.status === "active" ? "bg-primary-soft text-primary" : "bg-muted text-muted-foreground"
-            }`}>
+
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs ${
+                b.status === "active"
+                  ? "bg-primary-soft text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
               {b.status === "active" ? t("active") : t("inactive")}
             </span>
           </div>

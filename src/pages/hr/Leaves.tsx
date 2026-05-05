@@ -1,11 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { useLang } from "@/i18n/LangContext";
-import { leaves as initial } from "@/data/mock";
+// import { leaves as initial } from "@/data/mock";
 import { CalendarDays, Clock, CheckCircle2, XCircle, Check, X } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import { toast } from "sonner";
 
-type Leave = { id: string; employee: string; type: string; start: string; end: string; days: number; status: string };
+
+type Leave = {
+  id: string;
+  employee: string;
+  type: string;
+  start: string;
+  end: string;
+  days: number;
+  status: string;
+};
 
 // Mock API: simulate sending mobile push notification
 const notifyEmployee = async (employee: string, status: string) => {
@@ -16,19 +26,78 @@ const notifyEmployee = async (employee: string, status: string) => {
 
 const Leaves = () => {
   const { t } = useLang();
-  const [list, setList] = useState<Leave[]>(initial);
 
-  const updateStatus = async (id: string, status: "approved" | "rejected") => {
-    const target = list.find((l) => l.id === id);
-    setList(list.map((l) => (l.id === id ? { ...l, status } : l)));
-    toast.success("Leave status updated", {
-      description: `${target?.employee} • ${status === "approved" ? t("approved") : t("rejected")}`,
-    });
-    if (target) {
-      await notifyEmployee(target.employee, status);
-      toast(`📱 Notification sent to ${target.employee}`);
+
+
+  //here update 
+const [list, setList] = useState<Leave[]>([]);
+
+useEffect(() => {
+  const fetchLeaves = async () => {
+    const { data, error } = await supabase
+      .from("conges")
+      .select("*");
+
+    if (error) {
+      console.error(error);
+      return;
     }
+
+    const formatted =
+      data?.map((c) => ({
+        id: String(c.id_conge),
+        employee: `EMP ${c.id_emp}`,
+        type: c.type_conge ?? "-",
+        start: c.date_debut,
+        end: c.date_fin,
+        days: 0,
+        status:
+          c.statut === "ACCEPTE"
+            ? "approved"
+            : c.statut === "REFUSE"
+            ? "rejected"
+            : "pending",
+      })) || [];
+
+    setList(formatted);
   };
+
+  fetchLeaves();
+}, []);
+
+  //here end of update 
+
+
+
+const updateStatus = async (
+  id: string,
+  status: "approved" | "rejected"
+) => {
+  const dbStatus =
+    status === "approved"
+      ? "ACCEPTE"
+      : "REFUSE";
+
+  const { error } = await supabase
+    .from("demandes_conge")
+    .update({
+      statut: dbStatus,
+    })
+    .eq("id_demande", Number(id));
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  setList((prev) =>
+    prev.map((l) =>
+      l.id === id ? { ...l, status } : l
+    )
+  );
+
+  toast.success("Updated");
+};
 
   const color = (s: string) =>
     s === "approved"

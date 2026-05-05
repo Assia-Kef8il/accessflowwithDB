@@ -1,8 +1,52 @@
 import { useLang } from "@/i18n/LangContext";
-import { accessLogs } from "@/data/mock";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+
+interface AccessLog {
+  id: number;
+  employee: string;
+  date: string;
+  time: string;
+  door: string;
+  action: "entry" | "exit";
+}
 
 const AccessHistory = () => {
   const { t } = useLang();
+  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
+
+ useEffect(() => {
+  const fetchAccessLogs = async () => {
+    const { data, error } = await supabase
+      .from("historique_acces")
+      .select("*");
+
+    if (error) {
+      console.error("Error fetching access logs:", error);
+      return;
+    }
+
+    const formatted =
+      data?.map((l) => {
+        const dateObj = new Date(l.date_heure);
+
+        return {
+          id: l.id_acces,
+          employee: `Badge ${l.id_badge}`,
+          date: dateObj.toLocaleDateString(),
+          time: dateObj.toLocaleTimeString().slice(0, 5),
+          door: l.zone ?? "—",
+          action: (l.type_mouv === "ENTREE" ? "entry" : "exit") as "entry" | "exit",
+        };
+      }) || [];
+
+    setAccessLogs(formatted);
+  };
+
+  fetchAccessLogs();
+}, []);
+
   return (
     <div className="space-y-5">
       <h2 className="text-2xl font-bold">{t("accessHistory")}</h2>

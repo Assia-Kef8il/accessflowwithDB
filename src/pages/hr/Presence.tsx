@@ -1,5 +1,6 @@
 import { useLang } from "@/i18n/LangContext";
-import { presence } from "@/data/mock";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const Presence = () => {
   const { t } = useLang();
@@ -10,6 +11,49 @@ const Presence = () => {
     : "bg-destructive/10 text-destructive";
   const lbl = (s: string) =>
     s === "present" ? "✓" : s === "leave" ? t("onLeave") : s === "mission" ? t("onMission") : "Absent";
+
+  interface PresenceRecord {
+    id: number;
+    employee: string;
+    date: string;
+    entry: string;
+    exit: string;
+    status: "present" | "leave" | "mission" | string;
+  }
+
+  const [list, setList] = useState<PresenceRecord[]>([]);
+
+useEffect(() => {
+  const fetchPresence = async () => {
+    const { data, error } = await supabase
+      .from("pointage")
+      .select("*");
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const formatted =
+      data?.map((p) => ({
+        id: p.id_pointage,
+        employee: `EMP ${p.id_emp}`,
+        date: p.date_jour,
+        entry: p.heure_arrivee ?? "—",
+        exit: p.heure_sortie ?? "—",
+        status:
+          !p.heure_arrivee
+            ? "absent"
+            : !p.heure_sortie
+            ? "present"
+            : "present",
+      })) || [];
+
+    setList(formatted);
+  };
+
+  fetchPresence();
+}, []);
 
   return (
     <div className="space-y-5">
@@ -26,7 +70,7 @@ const Presence = () => {
             </tr>
           </thead>
           <tbody>
-            {presence.map((p) => (
+            {list.map((p) => (
               <tr key={p.id} className="border-t border-border hover:bg-primary-soft/40">
                 <td className="px-4 py-3 font-medium">{p.employee}</td>
                 <td className="px-4 py-3">{p.date}</td>

@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import { useLang } from "@/i18n/LangContext";
-import { initialEmployees, departments, categories, Employee } from "@/data/mock";
+// import { departments, categories } from "@/data/mock";
+import type { EmployeeUI } from "@/types/employee";
 import { Plus, X, Search, Users, UserCheck, Briefcase, IdCard } from "lucide-react";
 import StatCard from "@/components/StatCard";
+import { useEffect } from "react"
+import { supabase } from "@/lib/supabase"
 
 const empty = {
   nom: "", prenom: "", email: "", phone: "", matricule: "",
@@ -11,11 +14,55 @@ const empty = {
 
 const Employees = () => {
   const { t } = useLang();
-  const [list, setList] = useState<Employee[]>(initialEmployees);
+ const [list, setList] = useState<EmployeeUI[]>([])
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
+  const departments = ["IT", "RH", "Finance", "Sécurité"];
+  const categories = ["Cadre", "Maîtrise", "Exécution", "Stagiaire"];
+
+useEffect(() => {
+  const fetchEmployees = async () => {
+    const { data, error } = await supabase
+      .from("employes")
+      .select(`
+        id_emp,
+        nom,
+        prenom,
+        email,
+        telephone,
+        matricule_permis,
+        date_embauche,
+        categorie,
+        id_dept
+      `);
+
+    if (error) {
+      console.error("ERROR:", error);
+      return;
+    }
+
+    const formatted: EmployeeUI[] = (data || []).map((e) => ({
+      id: String(e.id_emp),
+      nom: e.nom,
+      prenom: e.prenom,
+      email: e.email,
+      phone: e.telephone,
+      matricule: e.matricule_permis,
+      permis: e.matricule_permis,
+      hireDate: e.date_embauche,
+      category: e.categorie,
+      permanent: e.categorie === "Permanent",
+      department: String(e.id_dept),
+    }));
+
+    setList(formatted);
+  };
+
+  fetchEmployees();
+}, []);
+ 
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -33,12 +80,31 @@ const Employees = () => {
     { label: t("badges"), value: list.length, icon: IdCard, tone: "primary" as const },
   ];
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setList([...list, { ...form, id: String(Date.now()) }]);
-    setForm(empty);
-    setOpen(false);
+
+const submit = (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const newEmp = {
+    id: String(Date.now()),
+    nom: form.nom,
+    prenom: form.prenom,
+    email: form.email,
+    phone: form.phone,
+    matricule: form.matricule,
+    permis: form.permis,
+    hireDate: form.hireDate,
+    category: form.category,
+    permanent: form.permanent,
+    department: form.department,
   };
+
+  setList((prev) => [...prev, newEmp]);
+
+  setForm(empty);
+  setOpen(false);
+};
+
+   
 
   return (
     <div className="space-y-5">
